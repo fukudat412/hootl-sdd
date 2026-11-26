@@ -1,0 +1,18 @@
+// 接続先は prisma.config.ts（Prisma 7 からスキーマに URL を書かない）
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ひな形の見本。最初の機能を作ったら置き換えてよい
+model Note {
+  id        String   @id @default(cuid())
+  body      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("notes")
+}

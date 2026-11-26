@@ -1,0 +1,11 @@
+// Cloudflare Workers の設定。デプロイは人が npm run deploy で行う（初回は npx wrangler login）
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "{{name}}",
+  "main": "src/index.ts",
+  "compatibility_date": "{{today}}",
+  "compatibility_flags": ["nodejs_compat"],
+  // 定期実行（UTC）。"0 21 * * *" は日本時間の毎朝 6:00。使わないなら消す
+  "triggers": { "crons": ["0 21 * * *"] },
+  "observability": { "enabled": true }
+}

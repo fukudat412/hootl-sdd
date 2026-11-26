@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 毎日 6:00 に {{name}} を動かす。登録は人が行う:
+     cp ops/launchd.plist ~/Library/LaunchAgents/dev.hootl.app.{{name}}.plist
+     launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/dev.hootl.app.{{name}}.plist
+     止める: launchctl bootout gui/$(id -u)/dev.hootl.app.{{name}} -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>dev.hootl.app.{{name}}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>{{repo}}/.venv/bin/python</string>
+    <string>-m</string>
+    <string>{{pkg}}</string>
+  </array>
+  <key>WorkingDirectory</key><string>{{repo}}</string>
+  <key>StartCalendarInterval</key>
+  <dict><key>Hour</key><integer>6</integer><key>Minute</key><integer>0</integer></dict>
+  <key>StandardOutPath</key><string>{{repo}}/.hootl/app.log</string>
+  <key>StandardErrorPath</key><string>{{repo}}/.hootl/app.log</string>
+</dict>
+</plist>

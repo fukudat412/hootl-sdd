@@ -1,0 +1,77 @@
+title = "バッチ（定期処理）"
+tech = "Python 3.11+・pytest・ruff・mypy"
+summary = "画面のない定期処理・データ取り込み・集計・通知など。Mac の launchd などで決まった時刻に動かす"
+order = 3
+requires = []
+notes = """
+- 入口は `src/{{pkg}}/__main__.py`（`python -m {{pkg}}`）。処理の中身は `src/{{pkg}}/job.py` などに分け、`tests/` の pytest で確かめる
+- `--dry-run` では書き込み・外部への送信をしない。起動確認ゲートは `--dry-run` で1回流す
+- 依存は `pyproject.toml` の dependencies に足す（仮想環境は `.venv`。毎回作り直す）
+- 時刻・乱数・外部への接続は引数で渡す（テストで差し替えるため）
+"""
+
+[[scaffold]]
+name = "仮想環境を作って依存を入れる"
+cmd = '"{{python}}" -m venv .venv && .venv/bin/pip install -q --upgrade pip && .venv/bin/pip install -q -e ".[dev]"'
+timeout_sec = 900
+
+[[scaffold]]
+name = "書式を整える（アプリ名の長さで変わるため）"
+cmd = ".venv/bin/ruff format . && .venv/bin/ruff check --fix ."
+timeout_sec = 120
+
+[[setup]]
+name = "venv"
+cmd = '"{{python}}" -m venv .venv && .venv/bin/pip install -q -e ".[dev]"'
+timeout_sec = 900
+
+[[gates]]
+name = "lint"
+title = "lint（ruff）"
+cmd = ".venv/bin/ruff check ."
+
+[[gates]]
+name = "format"
+title = "書式（ruff format）"
+cmd = ".venv/bin/ruff format --check ."
+
+[[gates]]
+name = "typecheck"
+title = "型チェック（mypy）"
+cmd = ".venv/bin/mypy src tests"
+
+[[gates]]
+name = "unit"
+title = "単体テスト（pytest）"
+cmd = ".venv/bin/pytest"
+required = true
+
+[[gates]]
+name = "smoke"
+title = "起動確認（--dry-run で1回流す）"
+cmd = ".venv/bin/python -m {{pkg}} --dry-run"
+timeout_sec = 300
+
+[[verify]]
+name = "起動確認（--dry-run で1回流す）"
+cmd = ".venv/bin/python -m {{pkg}} --dry-run"
+timeout_sec = 300
+
+[guard]
+protected_paths = ["ruff.toml", "mypy.ini", "pytest.ini"]
+always_allowed = ["pyproject.toml"]
+test_globs = ["tests/*"]
+forbidden_patterns = [
+  '@pytest\.mark\.(skip|xfail)',
+  'pytest\.skip\(',
+  '#\s*type:\s*ignore',
+  '#\s*noqa',
+]
+
+[env]
+PYTHONDONTWRITEBYTECODE = "1"
+
+[[options]]
+id = "launchd"
+title = "Mac で毎日決まった時刻に動かす（launchd）"
+summary = "launchd の設定ファイルを ops/ に置く。登録（launchctl bootstrap）は人が行う"

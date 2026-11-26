@@ -1,0 +1,86 @@
+title = "Cloudflare Workers（API・定期実行）"
+tech = "Cloudflare Workers・Hono 4・TypeScript・Vitest・wrangler 4"
+summary = "画面のない API や、Cloudflare 上で決まった時刻に動く処理（Cron Triggers）。サーバーの面倒を見なくてよい"
+order = 4
+requires = ["node", "npm"]
+min_node = 20   # Next.js 16・Expo SDK 58・wrangler 4 の下限
+ports = ["port"]
+notes = """
+- 入口は `src/index.ts`（HTTP は Hono の `app`、定期実行は `scheduled`）。処理の中身は `src/` の別ファイルに分け、`tests/` の Vitest で確かめる
+- 生存確認の `/api/health` は消さない（起動確認ゲートが使う）
+- 定期実行の時刻は `wrangler.jsonc` の `triggers.crons`（UTC）。KV・D1 などを使うときは `wrangler.jsonc` に binding を足し、`npx wrangler types` で型を作る
+- 手で確かめるとき: `npm run dev`（ポート {{port}}）。デプロイは人が `npm run deploy` で行う（初回は `npx wrangler login`）
+"""
+
+[[scaffold]]
+name = "node の版を記録"
+cmd = "node -p \"process.versions.node.split('.')[0]\" > .nvmrc"
+timeout_sec = 30
+
+[[scaffold]]
+name = "依存を入れる"
+cmd = "npm install --no-audit --no-fund hono@4"
+timeout_sec = 900
+
+[[scaffold]]
+name = "開発用の依存を入れる"
+cmd = "npm install -D --no-audit --no-fund wrangler@4 typescript@~6.0 vitest@5 vite@8 eslint@10 @eslint/js@10 typescript-eslint@8 @types/node"
+timeout_sec = 900
+
+[[setup]]
+name = "node"
+cmd = 'want=$(cat .nvmrc); have=$(node -p "parseInt(process.versions.node)"); [ "$have" -ge "$want" ] || { echo "Node $want 以上が必要です（今は $(node -v)）" >&2; exit 1; }'
+timeout_sec = 30
+
+[[setup]]
+name = "install"
+cmd = "npm ci --prefer-offline --no-audit --no-fund"
+timeout_sec = 900
+
+[[gates]]
+name = "lint"
+title = "lint（ESLint）"
+cmd = "npx eslint ."
+
+[[gates]]
+name = "typecheck"
+title = "型チェック（wrangler types → tsc）"
+cmd = "npx wrangler types && npx tsc --noEmit"
+
+[[gates]]
+name = "unit"
+title = "単体テスト（Vitest）"
+cmd = "npx vitest run"
+required = true
+
+[[gates]]
+name = "build"
+title = "Workers 向けにまとめられるか（wrangler の dry-run）"
+cmd = "npx wrangler deploy --dry-run --outdir .hootl-dist"
+timeout_sec = 300
+
+[[gates]]
+name = "boot"
+title = "起動確認（wrangler dev で /api/health を叩く）"
+cmd = '"{{python}}" "{{hootl}}/hootl/boot.py" --cmd "npx wrangler dev --ip 127.0.0.1 --port {port}" --url "http://127.0.0.1:{port}/api/health"'
+timeout_sec = 180
+default = false
+
+[[verify]]
+name = "起動確認（wrangler dev で /api/health を叩く）"
+cmd = '"{{python}}" "{{hootl}}/hootl/boot.py" --cmd "npx wrangler dev --ip 127.0.0.1 --port {port}" --url "http://127.0.0.1:{port}/api/health"'
+timeout_sec = 180
+
+[guard]
+protected_paths = ["tsconfig.json", "eslint.config.mjs", "vitest.config.ts"]
+always_allowed = ["package.json", "package-lock.json", "wrangler.jsonc"]
+test_globs = ["tests/*", "*.test.ts"]
+forbidden_patterns = [
+  '\b(it|test|describe)\.(skip|only|todo)\(',
+  '\bx(it|describe)\(',
+  '@ts-(ignore|nocheck|expect-error)',
+  'eslint-disable',
+]
+
+[env]
+WRANGLER_SEND_METRICS = "false"

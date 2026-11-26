@@ -1,0 +1,23 @@
+# hootl web の設定。ふつうは `hootl setup` が ~/.config/hootl/web.toml に作るので、手で書かなくてよい。
+# 手で書くときの見本。chmod 600 にする。起動: hootl web
+
+host = "127.0.0.1"   # 外には開けない。外からは Cloudflare Tunnel 経由で入る
+port = 8765
+
+# ログイン用のトークン（16文字以上）。openssl rand -hex 24 で作る。
+# 環境変数 HOOTL_WEB_TOKEN があれば、そちらが優先される。
+token = "ここに openssl rand -hex 24 の結果"
+
+# Cloudflare Access を通すなら、通してよいメールアドレス。
+# 空にすると照合しない（Mac の中だけで使うとき）。
+allowed_emails = []
+
+# この下の <名前>/hootl.toml を自動で拾う（増やしたら再起動なしで画面に出る）。
+projects_dir = "~/hootl-runs"
+
+# ほかの場所のプロジェクトは手で並べる。config は各プロジェクトの hootl.toml（専用 clone の中）。
+# spec は repo からの相対パス（「タスク案を作る」で読む仕様）。
+# [[projects]]
+# name = "mono"
+# config = "~/work/mono/hootl.toml"
+# spec = "apps/web/spec.md"

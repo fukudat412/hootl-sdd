@@ -1,0 +1,19 @@
+import { Hono } from "hono";
+import { runJob } from "./job";
+
+export const app = new Hono<{ Bindings: Env }>();
+
+// 生存確認（起動確認ゲートが叩く）。消さない
+app.get("/api/health", (c) => c.json({ ok: true }));
+
+app.get("/", (c) => c.text("{{title}}"));
+
+export default {
+  fetch: app.fetch,
+  // wrangler.jsonc の triggers.crons の時刻に呼ばれる
+  async scheduled(controller, _env, ctx) {
+    ctx.waitUntil(
+      runJob({ now: new Date(controller.scheduledTime) }).then((result) => console.log(result.summary)),
+    );
+  },
+} satisfies ExportedHandler<Env>;

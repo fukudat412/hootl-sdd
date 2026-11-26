@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>hootl の仕組み</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sofia+Sans+Condensed:wght@800&family=Instrument+Sans:wght@400;600&family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+/* VOICE: 工場の操作盤の横に貼る、1枚の工程図。短く、断定的に。
+   IDEA: 製造ラインの工程図。仕様が入口、マージ済みのコードが出口、人が立つ持ち場は朱色で3つだけ。
+   PICTURE: 横長のライン図。差し戻しの戻り矢印、ラインから外れる「要対応」、下を走る Web 管理画面の操作線。
+   COLOUR and TYPE: 白地に墨、朱 #ff4a1c は「人の持ち場」だけ。Sofia Sans Condensed 800 の数字と英字、和文は Noto Sans JP。
+   LAYOUT: 結論の見出し → 大きなライン図 → 1タスクの中身 → 外から触る道 → 1日の回し方 → 動かし方。 */
+:root{color-scheme:light dark;
+  --bg:light-dark(#ffffff,#120d0b);--ink:light-dark(#141414,#f2eeea);--sub:light-dark(#5d5d5d,#b3aca6);
+  --rule:light-dark(#dedede,#3a312d);--panel:light-dark(#f5f5f4,#1d1613);--red:light-dark(#ff4a1c,#ff6a43);--ok:light-dark(#1f6f50,#5cc39a)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.7 "Instrument Sans","Noto Sans JP",system-ui,sans-serif;overflow-x:clip}
+.band{padding:clamp(28px,4vw,64px) max(5vw,16px)}
+.wrap{max-width:1240px;margin:0 auto}
+h1,h2{font-family:"Noto Sans JP",sans-serif;font-weight:900;line-height:1.15;text-wrap:balance;margin:0}
+h1{font-size:clamp(28px,4.2vw,48px);max-width:24em}
+h2{font-size:clamp(22px,2.6vw,30px);margin-bottom:14px}
+.lead{font-size:17px;color:var(--sub);max-width:46em;margin:14px 0 0}
+.num{font-family:"Sofia Sans Condensed",sans-serif;font-weight:800}
+.scroll{overflow-x:auto}
+figure{margin:28px 0 0}
+.line-fig svg{display:block;width:100%;min-width:900px;height:auto;color:var(--ink)}
+figcaption{color:var(--sub);font-size:14px;margin-top:10px;max-width:60em}
+.human{fill:var(--red)}
+.token{offset-path:path("M372 230 H1150");animation:run 9s linear infinite}
+@keyframes run{0%{offset-distance:0%;opacity:0}5%{opacity:1}92%{opacity:1}100%{offset-distance:100%;opacity:0}}
+@media (prefers-reduced-motion:reduce){.token{animation:none;offset-distance:40%}}
+.dark-band{background:var(--panel)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:18px 28px}
+.step h3{font-size:17px;margin:0 0 4px;display:flex;gap:10px;align-items:baseline}
+.step h3 .num{font-size:28px;color:var(--sub);line-height:1}
+.step p{margin:0;color:var(--sub);font-size:15px}
+.step .fail{display:block;margin-top:6px;color:var(--ink);font-size:14px}
+.touch{border-left:4px solid var(--red);padding:2px 0 2px 14px}
+.touch h3{color:var(--red)}
+table{border-collapse:collapse;width:100%;font-size:15px}
+th,td{text-align:left;padding:10px 12px 10px 0;border-bottom:1px solid var(--rule);vertical-align:top}
+th{font-size:13px;color:var(--sub);font-weight:600}
+td:first-child{white-space:nowrap;font-weight:600}
+.cmds{display:grid;gap:18px}
+.cmd h3{font-size:16px;margin:0 0 6px}
+.cmd p{margin:0 0 8px;color:var(--sub);font-size:15px}
+pre{position:relative;margin:0;background:var(--panel);border:1px solid var(--rule);border-radius:10px;padding:14px 16px;font:13.5px/1.6 ui-monospace,Menlo,monospace;overflow-x:auto}
+.copy{position:absolute;top:8px;right:8px;font:600 13px "Noto Sans JP",sans-serif;background:var(--bg);color:var(--ink);border:1px solid var(--rule);border-radius:8px;padding:6px 10px;min-height:32px;cursor:pointer}
+.copy:focus-visible,a:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+.net svg{display:block;width:100%;max-width:980px;height:auto;color:var(--ink)}
+.note{font-size:14px;color:var(--sub)}
+.sw{display:none;margin:0 0 6px}@media(max-width:600px){.sw{display:block}}
+@media(max-width:600px){table{font-size:13px}.stack thead{display:none}.stack tr{display:grid;padding-block:10px}.stack td{display:flow-root;border:0;padding:3px 0;padding-inline-start:8em;text-align:start;white-space:normal}.stack td::before{content:attr(data-l);float:inline-start;width:7.5em;margin-inline-start:-8em;white-space:normal;color:var(--sub);font-weight:400}.stack td:empty{display:none}}
+</style>
+</head>
+<body>
+
+<section class="band"><div class="wrap">
+  <h1>作りたいものを書くと、マージ済みのコードが出てくる。人が立つ持ち場は3つだけ。</h1>
+  <p class="lead">hootl は、AI エージェントにタスクを1件ずつ渡し、テストとレビューで合否を決めて、通ったものだけを main に入れるライン。落ちたら理由を添えて差し戻し、3回落ちたらラインから外して朝の人に回す。止まらずに夜通し動く。</p>
+
+  <figure class="line-fig">
+    <p class="note sw">図は横にスクロールできます</p>
+    <div class="scroll">
+    <svg viewBox="0 0 1240 600" role="img" aria-label="hootl のライン: 人が作りたいものを書くと、仕様、計画、機械の確認、キュー、1タスクごとに準備・実装・安全柵・ゲート・レビューを通り、マージして main に入る。落ちれば実装へ差し戻し、3回で要対応に外れる。途中で見つけた案はネタ帳にたまり、人が選んだものだけが次の仕様になる。Web 管理画面から、作りたいものを書く・ネタ帳から選ぶ・停止・やり直しを操作する。">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker>
+        <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--red)"/></marker>
+      </defs>
+      <g font-family="Noto Sans JP, sans-serif" font-size="14" fill="currentColor">
+        <!-- 1タスク＝1セッションの枠 -->
+        <rect x="420" y="150" width="610" height="176" rx="14" fill="var(--panel)" stroke="var(--rule)"/>
+        <text x="436" y="314" font-size="12" fill="var(--sub)">1タスク＝新しいセッション（worktree の中・毎回まっさら）</text>
+        <!-- 本線 -->
+        <line x1="40" y1="230" x2="1180" y2="230" stroke="currentColor" stroke-width="3"/>
+        <!-- 入口 -->
+        <rect x="40" y="196" width="104" height="68" rx="8" fill="var(--bg)" stroke="currentColor" stroke-width="2"/>
+        <text x="92" y="226" text-anchor="middle" font-weight="700">spec.md</text>
+        <text x="92" y="248" text-anchor="middle" font-size="12" fill="var(--sub)">＋ specs/</text>
+        <rect x="176" y="196" width="104" height="68" rx="8" fill="var(--bg)" stroke="currentColor" stroke-width="2"/>
+        <text x="228" y="226" text-anchor="middle" font-weight="700">計画</text>
+        <text x="228" y="248" text-anchor="middle" font-size="12" fill="var(--sub)">タスク案に分ける</text>
+        <!-- 人①: 何を作るかを決める（書く・ネタ帳から選ぶ）。仕様と計画の承認は、機械の確認に置き換えた -->
+        <circle cx="92" cy="144" r="22" class="human"/>
+        <text x="92" y="150" text-anchor="middle" fill="#fff" font-weight="900" font-size="17">1</text>
+        <text x="92" y="108" text-anchor="middle" fill="var(--red)" font-weight="700">書く・選ぶ</text>
+        <path d="M92 168 V192" fill="none" stroke="var(--red)" stroke-width="2" marker-end="url(#arr)"/>
+        <!-- 機械の確認（承認の代わり） -->
+        <circle cx="316" cy="230" r="13" fill="var(--bg)" stroke="currentColor" stroke-width="2"/>
+        <path d="M310 230 L315 235 L323 225" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+        <text x="316" y="182" text-anchor="middle" font-size="12" fill="var(--sub)">機械の確認</text>
+        <!-- ネタ帳: 途中で見つけた案をためる。作るのは人が選んだものだけ -->
+        <rect x="190" y="100" width="150" height="50" rx="8" fill="var(--bg)" stroke="currentColor" stroke-width="2" stroke-dasharray="5 5"/>
+        <text x="265" y="122" text-anchor="middle" font-weight="700">ネタ帳</text>
+        <text x="265" y="140" text-anchor="middle" font-size="12" fill="var(--sub)">途中で見つけた案</text>
+        <path d="M436 150 C436 124 400 124 344 124" fill="none" stroke="currentColor" stroke-width="1.6" stroke-dasharray="5 5" marker-end="url(#ar)"/>
+        <path d="M188 128 C160 128 140 134 118 140" fill="none" stroke="var(--red)" stroke-width="2" marker-end="url(#arr)"/>
+        <!-- キュー -->
+        <rect x="350" y="196" width="56" height="68" rx="8" fill="var(--bg)" stroke="currentColor" stroke-width="2"/>
+        <text x="378" y="226" text-anchor="middle" font-weight="700">待ち</text>
+        <text x="378" y="248" text-anchor="middle" font-size="12" fill="var(--sub)">キュー</text>
+        <!-- 工程 -->
+        <g>
+          <rect x="440" y="200" width="96" height="60" rx="30" fill="var(--bg)" stroke="currentColor" stroke-width="2"/>
+          <text x="488" y="236" text-anchor="middle" font-weight="700">準備</text>
+          <rect x="556" y="200" width="96" height="60" rx="30" fill="var(--bg)" stroke="currentColor" stroke-width="2"/>
+          <text x="604" y="236" text-anchor="middle" font-weight="700">実装</text>
+          <rect x="672" y="200" width="96" height="60" rx="30" fill="var(--bg)" stroke="currentColor" stroke-width="2"/>
+          <text x="720" y="236" text-anchor="middle" font-weight="700">安全柵</text>
+          <rect x="788" y="200" width="96" height="60" rx="30" fill="var(--bg)" stroke="currentColor" stroke-width="2"/>
+          <text x="836" y="236" text-anchor="middle" font-weight="700">ゲート</text>
+          <rect x="904" y="200" width="96" height="60" rx="30" fill="var(--bg)" stroke="currentColor" stroke-width="2"/>
+          <text x="952" y="236" text-anchor="middle" font-weight="700">レビュー</text>
+          <text x="488" y="286" text-anchor="middle" font-size="12" fill="var(--sub)">依存を入れる</text>
+          <text x="604" y="286" text-anchor="middle" font-size="12" fill="var(--sub)">Claude Code</text>
+          <text x="720" y="286" text-anchor="middle" font-size="12" fill="var(--sub)">判定側を守る</text>
+          <text x="836" y="286" text-anchor="middle" font-size="12" fill="var(--sub)">終了コードで判定</text>
+          <text x="952" y="286" text-anchor="middle" font-size="12" fill="var(--sub)">Codex（別の目）</text>
+        </g>
+        <!-- 出口 -->
+        <rect x="1050" y="196" width="80" height="68" rx="8" fill="var(--bg)" stroke="currentColor" stroke-width="2"/>
+        <text x="1090" y="226" text-anchor="middle" font-weight="700">マージ</text>
+        <text x="1090" y="248" text-anchor="middle" font-size="12" fill="var(--sub)">main へ</text>
+        <rect x="1146" y="196" width="80" height="68" rx="8" fill="var(--ink)"/>
+        <text x="1186" y="226" text-anchor="middle" font-weight="700" fill="var(--bg)">push</text>
+        <text x="1186" y="248" text-anchor="middle" font-size="12" fill="var(--bg)">GitHub</text>
+        <!-- 流れるタスク -->
+        <circle r="7" class="token" fill="currentColor"/>
+        <!-- 差し戻し -->
+        <path d="M720 200 C720 120 604 120 604 196" fill="none" stroke="currentColor" stroke-width="1.6" stroke-dasharray="5 5" marker-end="url(#ar)"/>
+        <path d="M836 200 C836 96 604 96 604 196" fill="none" stroke="currentColor" stroke-width="1.6" stroke-dasharray="5 5"/>
+        <path d="M952 200 C952 72 604 72 604 196" fill="none" stroke="currentColor" stroke-width="1.6" stroke-dasharray="5 5"/>
+        <text x="780" y="62" text-anchor="middle" font-weight="700">落ちたら、ログと指摘を添えて実装へ差し戻す（最大3回）</text>
+        <!-- 要対応に外れる -->
+        <path d="M836 326 V392" fill="none" stroke="var(--red)" stroke-width="2" marker-end="url(#arr)"/>
+        <text x="848" y="356" font-size="13" fill="var(--red)">3回目も落ちた</text>
+        <rect x="760" y="396" width="152" height="56" rx="8" fill="var(--bg)" stroke="var(--red)" stroke-width="2"/>
+        <text x="836" y="430" text-anchor="middle" font-weight="700" fill="var(--red)">要対応</text>
+        <!-- 人②: 朝 -->
+        <circle cx="560" cy="424" r="22" class="human"/>
+        <text x="560" y="430" text-anchor="middle" fill="#fff" font-weight="900" font-size="17">2</text>
+        <path d="M758 424 H586" fill="none" stroke="var(--red)" stroke-width="2" marker-end="url(#arr)"/>
+        <text x="672" y="414" text-anchor="middle" font-size="13" fill="var(--red)">朝に見る</text>
+        <path d="M538 424 H378 V266" fill="none" stroke="var(--red)" stroke-width="2" marker-end="url(#arr)"/>
+        <text x="456" y="414" text-anchor="middle" font-size="13" fill="var(--red)">直してやり直す</text>
+        <!-- 人③: 公開 -->
+        <circle cx="1186" cy="330" r="22" class="human"/>
+        <text x="1186" y="336" text-anchor="middle" fill="#fff" font-weight="900" font-size="17">3</text>
+        <path d="M1186 266 V306" fill="none" stroke="var(--red)" stroke-width="2"/>
+        <text x="1186" y="378" text-anchor="middle" fill="var(--red)" font-weight="700">公開する</text>
+        <text x="1186" y="398" text-anchor="middle" font-size="12" fill="var(--sub)">ストア・本番</text>
+        <!-- Web 管理画面 -->
+        <rect x="40" y="508" width="1160" height="64" rx="12" fill="none" stroke="currentColor" stroke-width="2"/>
+        <text x="64" y="546" font-weight="700" font-size="16">Web 管理画面（スマホから）</text>
+        <text x="300" y="546" font-size="13" fill="var(--sub)">作りたいものを書く・ネタ帳から選ぶ・見る・止める・やり直す。任意のコマンドは打てない</text>
+        <g stroke="currentColor" stroke-width="1.4" stroke-dasharray="3 5" fill="none">
+          <path d="M92 506 V268" marker-end="url(#ar)"/>
+          <path d="M392 506 V268" marker-end="url(#ar)"/>
+          <path d="M560 506 V450" marker-end="url(#ar)"/>
+          <path d="M1000 506 V330" marker-end="url(#ar)"/>
+        </g>
+        <text x="404" y="490" font-size="12" fill="var(--sub)">回す・止める</text>
+        <text x="1012" y="490" font-size="12" fill="var(--sub)">いまどの工程か見る</text>
+      </g>
+    </svg>
+    </div>
+    <figcaption>朱色の丸が人の持ち場。1 は何を作るかを決める所（作りたいものを数行書くか、ネタ帳から選ぶ）。そこから先の仕様・凍結・計画・取り込みは、承認を挟まずに機械の確認で進む。2 は朝にラインから外れたタスクだけを見る所。3 は main に入ったものを外へ出す所（ストアの審査や本番の公開は人が押す）。作業の途中でエージェントが見つけた案は、作らずにネタ帳にたまり、1 に戻ってくる。</figcaption>
+  </figure>
+</div></section>
+
+<section class="band dark-band"><div class="wrap">
+  <h2>1タスクの中で起きること。「終わった」はモデルではなく判定が決める</h2>
+  <div class="grid">
+    <div class="step"><h3><span class="num">1</span>準備</h3><p>main から worktree を切り、依存を入れ、使い捨てのテスト用 DB をまっさらにする。</p><span class="fail">落ちたら: 環境の問題なので、すぐ要対応へ</span></div>
+    <div class="step"><h3><span class="num">2</span>実装</h3><p>Claude Code がタスクと受け入れ条件を受け取り、コードとテストを書く。依存の追加やスキーマ変更もしてよい（理由を残す）。</p><span class="fail">落ちたら: 異常終了なら差し戻し</span></div>
+    <div class="step"><h3><span class="num">3</span>安全柵</h3><p>判定する側（lint・型・テストの設定、CI、規約）を触っていないか、テストを無効にしていないかを機械で見る。</p><span class="fail">落ちたら: 違反の一覧を添えて差し戻し</span></div>
+    <div class="step"><h3><span class="num">4</span>ゲート</h3><p>lint・型チェック・テスト・ビルドを上から順に。全部が終了コード 0 なら通る。</p><span class="fail">落ちたら: 出力の末尾を添えて差し戻し</span></div>
+    <div class="step"><h3><span class="num">5</span>レビュー</h3><p>別ベンダーのモデル（Codex）が、差分と受け入れ条件を突き合わせる。盲点が重ならないように別の目にする。</p><span class="fail">落ちたら: 指摘を添えて差し戻し</span></div>
+    <div class="step"><h3><span class="num">6</span>マージ</h3><p>main に入れて push。ほかのタスクとぶつかったら、最新の main から作り直す。</p><span class="fail">落ちたら: 衝突として差し戻し</span></div>
+  </div>
+</div></section>
+
+<section class="band"><div class="wrap">
+  <h2>外から触る道。鍵は2本、入口は1つ</h2>
+  <figure class="net">
+    <svg viewBox="0 0 980 190" role="img" aria-label="スマホから Cloudflare Access のメール認証を通り、Cloudflare Tunnel で Mac の 127.0.0.1 の hootl web に届く。hootl web は hootl run を起動し、状態は state.db に残る。">
+      <defs><marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>
+      <g font-family="Noto Sans JP, sans-serif" font-size="14" fill="currentColor">
+        <rect x="10" y="60" width="130" height="64" rx="10" fill="none" stroke="currentColor" stroke-width="2"/>
+        <text x="75" y="98" text-anchor="middle" font-weight="700">スマホ</text>
+        <rect x="200" y="40" width="200" height="104" rx="10" fill="var(--panel)" stroke="var(--rule)"/>
+        <text x="300" y="70" text-anchor="middle" font-size="12" fill="var(--sub)">Cloudflare</text>
+        <text x="300" y="96" text-anchor="middle" font-weight="700">Access</text>
+        <text x="300" y="118" text-anchor="middle" font-size="12" fill="var(--red)">鍵1: 自分のメールだけ</text>
+        <rect x="460" y="40" width="200" height="104" rx="10" fill="var(--panel)" stroke="var(--rule)"/>
+        <text x="560" y="70" text-anchor="middle" font-size="12" fill="var(--sub)">Mac（127.0.0.1 だけで待つ）</text>
+        <text x="560" y="96" text-anchor="middle" font-weight="700">hootl web</text>
+        <text x="560" y="118" text-anchor="middle" font-size="12" fill="var(--red)">鍵2: トークン</text>
+        <rect x="720" y="20" width="200" height="56" rx="10" fill="none" stroke="currentColor" stroke-width="2"/>
+        <text x="820" y="54" text-anchor="middle" font-weight="700">hootl run</text>
+        <rect x="720" y="108" width="200" height="56" rx="10" fill="none" stroke="currentColor" stroke-width="2"/>
+        <text x="820" y="142" text-anchor="middle" font-weight="700">state.db・ログ</text>
+        <g stroke="currentColor" stroke-width="1.6" fill="none">
+          <path d="M140 92 H198" marker-end="url(#ar2)"/><path d="M400 92 H458" marker-end="url(#ar2)"/>
+          <path d="M660 70 L718 52" marker-end="url(#ar2)"/><path d="M660 114 L718 132" marker-end="url(#ar2)"/>
+          <path d="M820 76 V106" marker-end="url(#ar2)"/>
+        </g>
+        <text x="429" y="84" text-anchor="middle" font-size="11" fill="var(--sub)">Tunnel</text>
+        <text x="690" y="50" text-anchor="middle" font-size="11" fill="var(--sub)">起動・停止</text>
+        <text x="690" y="148" text-anchor="middle" font-size="11" fill="var(--sub)">読む</text>
+      </g>
+    </svg>
+    <figcaption>Mac はポートを外に開けない。Cloudflare Tunnel が内側からつなぎ、Access が自分のメール以外を門前払いする。その先でもトークンが要り、画面からできるのは決まった操作だけ。</figcaption>
+  </figure>
+</div></section>
+
+<section class="band dark-band"><div class="wrap">
+  <h2>1日の回し方</h2>
+  <table class="stack">
+    <thead><tr><th>いつ</th><th>人がやること</th><th>ライン</th></tr></thead>
+    <tbody>
+      <tr><td>始めるとき</td><td>「＋ 新しいアプリ」で作りたいもの・型（Web／スマホ／バッチ／Cloudflare Workers）・オプション・ゲートを選んで「作る」</td><td>フォルダ・git・依存・全ゲート・起動確認・最初のコミット・仕様まで進み、そのまま計画 → 実装へ続く。ゲートは型ごとに共通の部品</td></tr>
+      <tr><td>思いついたとき</td><td>管理画面の「仕様」タブに作りたいものを数行書いて「おまかせで作る」。または「ネタ帳」から選んで「これを作る」（持ち場 1）。Mac はスリープさせない</td><td>仕様を書いて凍結し（specs/ に入り main にコミット）、タスクに分け、機械で確かめて「待ち」に入れ、そのまま回す。待ちから1件ずつ取り、通れば main に入れて push</td></tr>
+      <tr><td>朝</td><td>要対応だけ見る。ログで原因を確かめ、タスクを直すか、割るか、捨てる（持ち場 2）。ネタ帳に増えた案を読む</td><td>レポートが1本増えている。途中で見つけた案がネタ帳に並んでいる</td></tr>
+      <tr><td>機械の確認で止まったとき</td><td>「計画と承認」に残ったタスク案を直して取り込む（行き先のない依存・件数が多すぎる、など）</td><td>取り込まずに待っている</td></tr>
+      <tr><td>出すとき</td><td>main を触って確かめ、ストアや本番に出す（持ち場 3）</td><td>—</td></tr>
+    </tbody>
+  </table>
+</div></section>
+
+<section class="band"><div class="wrap">
+  <h2>動かし方。始めるのは1コマンド</h2>
+  <p class="lead" style="margin:0 0 22px">設定ファイル、トークン、自動起動、ブラウザで開くまでを hootl setup がやる。何度実行してもよく、あるものは残して足りないものだけ作る。</p>
+  <div class="cmds">
+    <div class="cmd"><h3>1. 手元で使い始める</h3><p>道具を確かめ、設定を作り、Mac にログインしたら自動で起動するよう登録して、ブラウザで開く。トークンはクリップボードに入るので、貼り付けて入る。</p>
+<pre><code>cd ~/hootl-sdd &amp;&amp; python3 -m pip install -e '.[dev]'
+hootl setup</code></pre></div>
+    <div class="cmd"><h3>2. スマホからも使う</h3><p>1回目は Cloudflare Access（門番）の作り方を出して止まる。門番ができるまで外には出さない。作ったら --access-ready を足してもう一度。</p>
+<pre><code>hootl setup --email 自分のメールアドレス --hostname hootl.example.com
+hootl setup --email 自分のメールアドレス --hostname hootl.example.com --access-ready</code></pre></div>
+    <div class="cmd"><h3>3. 様子がおかしいとき</h3><p>道具・設定・見つかったプロジェクト・画面の応答・トンネルを一覧する。</p>
+<pre><code>hootl doctor</code></pre></div>
+  </div>
+  <p class="note" style="margin-top:18px">プロジェクトは ~/hootl-runs/ の下の専用 clone から自動で拾う。増やしても設定は直さなくてよい。寝ている間も回すなら、電源につないだ Mac がスリープしない設定にしておく。詳しくは hootl-sdd の docs/web-admin.md。</p>
+</div></section>
+
+<script>
+{
+  for (const pre of document.querySelectorAll('pre')) {
+    const b = document.createElement('button');
+    b.className = 'copy'; b.type = 'button'; b.textContent = 'コピー';
+    b.addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(pre.querySelector('code').textContent); b.textContent = 'コピーしました'; }
+      catch { b.textContent = '選んでコピーしてください'; }
+      setTimeout(() => { b.textContent = 'コピー'; }, 2000);
+    });
+    pre.append(b);
+  }
+}
+</script>
+</body>
+</html>

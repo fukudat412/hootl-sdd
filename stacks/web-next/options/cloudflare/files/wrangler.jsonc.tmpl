@@ -1,0 +1,13 @@
+// Cloudflare Workers の設定（OpenNext）。デプロイは人が npm run deploy で行う（初回は npx wrangler login）
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "{{name}}",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "{{today}}",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "observability": { "enabled": true }
+}

@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>hootl</title>
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<header class="top">
+  <h1 class="brand">hootl</h1>
+  <nav class="projects" id="projects" aria-label="プロジェクト"></nav>
+  <a class="help-link" href="/help">使い方</a>
+</header>
+
+<main id="new-view" class="new-view" hidden></main>
+
+<main id="main">
+  <section class="line-wrap" aria-label="ラインの状況">
+    <ol class="line" id="line"></ol>
+    <p class="line-note" id="line-note"></p>
+  </section>
+
+  <section class="controls" aria-label="操作">
+    <div class="run-box" id="run-box"></div>
+  </section>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="tasks" aria-selected="true">タスク</button>
+    <button role="tab" data-tab="spec" aria-selected="false">仕様</button>
+    <button role="tab" data-tab="ideas" aria-selected="false">ネタ帳</button>
+    <button role="tab" data-tab="plan" aria-selected="false">計画と承認</button>
+    <button role="tab" data-tab="reports" aria-selected="false">レポート</button>
+    <button role="tab" data-tab="settings" aria-selected="false">設定</button>
+  </nav>
+
+  <section id="tab-tasks" class="tab"></section>
+  <section id="tab-spec" class="tab" hidden></section>
+  <section id="tab-ideas" class="tab" hidden></section>
+  <section id="tab-plan" class="tab" hidden></section>
+  <section id="tab-reports" class="tab" hidden></section>
+  <section id="tab-settings" class="tab" hidden></section>
+</main>
+
+<div class="sheet-backdrop" id="sheet-backdrop" hidden></div>
+<aside class="sheet" id="sheet" hidden aria-modal="true" role="dialog" aria-labelledby="sheet-title">
+  <div class="sheet-head">
+    <h2 id="sheet-title"></h2>
+    <button class="ghost" id="sheet-close" aria-label="閉じる">閉じる</button>
+  </div>
+  <div class="sheet-body" id="sheet-body"></div>
+</aside>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+<script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,95 @@
+# hootl の設定。対象リポジトリのルートに hootl.toml として置く。
+# ハーネスは main ブランチに直接マージするので、普段作業する clone とは別の clone で回すこと。
+
+repo = "."
+main_branch = "main"
+prompts_dir = "/path/to/hootl-sdd/prompts"   # ハーネス同梱のプロンプト。プロジェクト用に複製して調整してもよい
+
+[run]
+state_dir = ".hootl"                # キュー・ログ・レポート（.gitignore に入れる）
+worktree_dir = ".hootl/worktrees"
+concurrency = 2                     # Mac なら 1〜2、コンテナなら 3〜4
+max_attempts = 3                    # これを超えたら blocked
+max_tasks_per_run = 200
+feedback_tail_chars = 4000          # 差し戻し時に渡すゲート出力の長さ
+review_tries = 3                    # レビュー役が判定を返さなかったら、実装はやり直さずレビューだけをやり直す（最初の1回を含む回数）
+review_retry_wait_sec = 20          # やり直す前に待つ秒数
+diff_max_chars = 60000              # レビューに渡す差分の上限
+
+# ---- おまかせ -----------------------------------------------------------
+# 作りたいものを書いたら、仕様 → 凍結 → 計画 → 取り込み → 実行まで、人の承認なしで進める（hootl auto・管理画面の既定）。
+# 承認の代わりに機械の確認（id の重なり・行き先のない依存・依存の輪・件数）を通す。通らなければ取り込まずに人に回す。
+# 作業の途中でエージェントが見つけた案は、作らずにネタ帳にためる（hootl ideas・管理画面の「ネタ帳」）。
+[auto]
+approve = true                      # false にすると、仕様の下書きとタスク案で止まり、人が承認する
+run = true                          # 取り込んだら、そのまま回す
+hours = 7                           # おまかせで回す時間の上限（0 で、空になるまで）
+max_tasks = 20                      # 1つの仕様からこれより多く出たら、人に回す（発散の歯止め）
+
+# ---- エージェント -------------------------------------------------------
+# プロンプトは標準入力で渡る。{prompt_file} と書けばファイルパスで渡すこともできる。
+# 導入時に `claude --help` / `codex exec --help` でフラグを確認すること。
+
+[agents.planner]
+cmd = ["claude", "-p", "--model", "opus", "--output-format", "text"]
+timeout_sec = 1800
+
+[agents.implementer]
+cmd = ["claude", "-p", "--model", "sonnet", "--output-format", "json", "--max-turns", "80"]
+# コンテナ内で回すときだけ、確認待ちで止まらないように権限確認を飛ばす:
+# cmd = ["claude", "-p", "--model", "sonnet", "--output-format", "json", "--max-turns", "80",
+#        "--dangerously-skip-permissions"]
+timeout_sec = 3600
+
+[agents.reviewer]
+# モデルは明示する。~/.codex/config.toml の既定に任せると、そのモデルが提供終了したときにレビューが全部 fail になる
+cmd = ["codex", "exec", "--model", "gpt-6.1-sol", "--sandbox", "read-only", "-"]
+timeout_sec = 1200
+
+# ---- ゲート（上から順に実行し、落ちたら止める）--------------------------
+[[gates]]
+name = "install"
+cmd = "pnpm install --frozen-lockfile --prefer-offline"
+timeout_sec = 600
+
+[[gates]]
+name = "lint"
+cmd = "pnpm biome check ."
+
+[[gates]]
+name = "typecheck"
+cmd = "pnpm tsc --noEmit"
+
+[[gates]]
+name = "unit"
+cmd = "pnpm vitest run"
+
+[[gates]]
+name = "e2e"
+cmd = "pnpm playwright test"
+timeout_sec = 900
+
+# ---- 安全柵 -------------------------------------------------------------
+[guard]
+# エージェントが触ってはいけないもの（ゲートやハーネスの設定、規約、依存のロック）
+protected_paths = [
+  "hootl.toml", ".hootl/*", "CLAUDE.md", "AGENTS.md", ".claude/*",
+  "biome.json", "tsconfig.json", "vitest.config.*", "playwright.config.*",
+  "package.json", "pnpm-lock.yaml", ".github/*",
+]
+test_globs = ["tests/*", "e2e/*", "*.test.ts", "*.test.tsx", "*.spec.ts"]
+# 追加行にこれが含まれたら差し戻し（テストの無効化・型チェックの抑止）
+forbidden_patterns = [
+  '\b(it|test|describe)\.(skip|only|todo)\(',
+  '\bx(it|describe)\(',
+  '@ts-(ignore|nocheck)',
+  'biome-ignore',
+  'eslint-disable',
+]
+
+[notify]
+# discord_webhook = "https://discord.com/api/webhooks/..."
+
+[env]
+# エージェントとゲートに渡す環境変数
+CI = "1"

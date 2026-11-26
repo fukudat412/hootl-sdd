@@ -1,0 +1,27 @@
+[project]
+name = "hootl"
+version = "0.1.0"
+description = "Human-out-of-the-loop spec-driven development harness"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+hootl = "hootl.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["hootl"]
+
+[tool.setuptools.package-data]
+hootl = ["web_static/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

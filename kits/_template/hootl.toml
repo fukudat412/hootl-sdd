@@ -1,0 +1,116 @@
+# hootl 設定テンプレート（RUNBOOK-onboard.md の手順 5 で <...> を埋めて kits/<name>/hootl.toml にする）
+# 置き場所: ~/hootl-runs/<name>/hootl.toml （回す専用の clone のルート。.gitignore 済み）
+#
+# 埋め方の原則（最初のプロジェクトの初回ランで分かったこと）
+# - ゲートは npm scripts を経由せずツールを直接呼ぶ（package.json の編集を許すので、scripts の書き換えで骨抜きにされないように）
+# - レビューの codex は --model を明示する（既定モデルが提供終了すると、何も出さずに終わってレビューが全部 fail になる）
+# - Node を使うなら、最初の準備で .nvmrc の版を確かめる（古いターミナルから起動すると前の版のまま全部通ってしまう）
+# - DB を使うなら、使い捨てのテスト用 DB を準備で毎回リセットする。本番や普段使いの DB の URL は絶対に入れない
+
+repo = "."
+main_branch = "main"
+prompts_dir = "/path/to/hootl-sdd/prompts"
+
+[run]
+state_dir = ".hootl"
+worktree_dir = ".hootl/worktrees"
+concurrency = 1                     # メモリ 8GB の Mac では 1。常時起動機に移したら 2〜3
+max_attempts = 3
+max_tasks_per_run = 30
+push_remote = "origin"              # 手順 2 で「push しても自動デプロイされない」と確認できたときだけ。できなければ消す
+feedback_tail_chars = 4000
+diff_max_chars = 60000
+
+# おまかせ: 仕様の凍結とタスク案の取り込みを、人の承認なしで機械の確認だけで進める（既定は全部 on）
+# [auto]
+# approve = false                   # 下書きとタスク案で止めて、人が承認する
+# run = false                       # 取り込みまでにして、回すのは人が押す
+# hours = 7                         # おまかせで回す時間の上限（0 で、空になるまで）
+# max_tasks = 20                    # 1つの仕様からこれより多く出たら、人に回す
+
+[agents.planner]
+cmd = ["claude", "-p", "--model", "opus", "--output-format", "text"]
+timeout_sec = 1800
+
+[agents.implementer]
+# 権限は --settings で無人エージェントにだけ渡す（人の Claude Code には効かない）。「広く許可・狭く拒否」
+cmd = ["claude", "-p", "--model", "sonnet", "--output-format", "json", "--max-turns", "80",
+       "--settings", "/path/to/hootl-sdd/kits/<name>/claude-settings.hootl.json"]
+timeout_sec = 3600
+
+[agents.reviewer]
+# 手順 6 で動作確認したモデルの slug を入れる（~/.codex/models_cache.json）
+cmd = ["codex", "exec", "--model", "<codex-model>", "--sandbox", "read-only", "-"]
+timeout_sec = 1200
+
+# ---- 準備（worktree を作った直後、エージェントより前に実行）----------------
+# Node のプロジェクトで .nvmrc があるとき
+[[setup]]
+name = "node"
+cmd = 'want=$(cat .nvmrc); have=$(node -p "parseInt(process.versions.node)"); [ "$have" -ge "$want" ] || { echo "Node $want 以上が必要です（今は $(node -v)）。clone で nvm use してから hootl run してください" >&2; exit 1; }'
+timeout_sec = 30
+
+[[setup]]
+name = "install"
+cmd = "<lockfile どおりに入れるコマンド。npm なら npm ci --prefer-offline --no-audit --no-fund、pnpm なら pnpm install --frozen-lockfile --prefer-offline>"
+timeout_sec = 900
+
+# DB を使うときだけ。テスト用 DB を毎回まっさらにする（Prisma の例）
+# [[setup]]
+# name = "test-db"
+# cmd = "npx prisma db push --force-reset"
+# timeout_sec = 300
+
+# ---- ゲート（上から順に実行し、落ちたら止める）--------------------------
+# 手順 3 で main 上で全部緑になることを確かめたものだけを入れる
+[[gates]]
+name = "lint"
+cmd = "<例: npx eslint . / npx biome check .>"
+
+[[gates]]
+name = "typecheck"
+cmd = "<例: npx tsc --noEmit / npx astro check>"
+
+# DB を使うとき（Prisma の例）。データが消える変更はここで反映する（Prisma はエージェントからの --accept-data-loss を拒否する）
+# [[gates]]
+# name = "schema"
+# cmd = "npx prisma validate && npx prisma db push --accept-data-loss"
+
+[[gates]]
+name = "unit"
+cmd = "<例: npx vitest run>"
+
+[[gates]]
+name = "build"
+cmd = "<例: npx next build / npx astro build。DB マイグレーションを含む npm run build は使わない>"
+timeout_sec = 900
+
+# ---- 安全柵 -------------------------------------------------------------
+[guard]
+out_of_scope = "review"             # タスクの paths の外を触っても弾かず、レビュー役に判断させる
+# 判定する側（ゲート・規約・CI）だけを守る。実在するファイル名に合わせる
+protected_paths = [
+  "hootl.toml", ".hootl/*", "CLAUDE.md", "AGENTS.md", ".claude/*",
+  "tsconfig.json", "<lint の設定>", "<テストの設定>", ".github/*",
+]
+# どのタスクでも触ってよいもの（依存・スキーマ・生成される UI 部品など）
+always_allowed = [
+  "package.json", "<lockfile>", "docs/decisions/*",
+]
+test_globs = ["tests/*", "e2e/*", "*.test.ts", "*.test.tsx", "*.spec.ts"]
+forbidden_patterns = [
+  '\b(it|test|describe)\.(skip|only|todo)\(',
+  '\bx(it|describe)\(',
+  '@ts-(ignore|nocheck|expect-error)',
+  'eslint-disable',
+  'biome-ignore',
+  # 手順 2 で見つけた本番の接続先のホスト名を足す（例: 'neon\.tech'）
+]
+
+[notify]
+# discord_webhook = "https://discord.com/api/webhooks/..."
+
+# ---- 環境変数（エージェントとゲートに渡す。本番・普段使いの接続先は入れない）--
+[env]
+CI = "1"
+# DATABASE_URL = "postgresql://<user>:<pass>@localhost:<port>/<name>_test"

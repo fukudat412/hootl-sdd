@@ -1,0 +1,10 @@
+from datetime import datetime
+
+from {{pkg}}.job import run
+
+
+def test_run_reports_time_and_mode() -> None:
+    result = run(now=datetime(2026, 1, 2, 3, 4), dry_run=True)
+    assert result.ok
+    assert "2026-01-02 03:04" in result.summary
+    assert "dry-run" in result.summary

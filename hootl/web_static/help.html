@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>hootl の使い方</title>
+<style>
+/* ログイン前でも読めるように、このページだけで完結させる（app.css は読まない）。色は管理画面と同じ */
+:root {
+  --ground: #edf0f2; --panel: #f8f9fa; --ink: #1b2430; --steel: #5c6b79; --rule: #cbd3da;
+  --red: #c2382e; --green: #1e7458; --focus: #2b6cb0;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --ground: #13181e; --panel: #1b222a; --ink: #e4e9ee; --steel: #93a2b0; --rule: #2e3944;
+    --red: #e0645a; --green: #4fb08c; --focus: #7fb0ea; color-scheme: dark; }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body {
+  margin: 0; background: var(--ground); color: var(--ink);
+  font: 15.5px/1.75 "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", system-ui, sans-serif;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+a { color: var(--focus); }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.top { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; max-width: 860px; margin: 0 auto; padding: 14px 16px 10px; }
+.brand { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: .02em; }
+.back { margin-left: auto; border: 1px solid var(--rule); border-radius: 999px; padding: 4px 14px; text-decoration: none; color: var(--ink); }
+main { max-width: 860px; margin: 0 auto; padding: 4px 16px 56px; }
+h1 { font-size: 24px; line-height: 1.35; margin: 14px 0 6px; }
+.lead { color: var(--steel); margin: 0 0 18px; }
+.toc { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; padding: 0; list-style: none; }
+.toc a { display: block; border: 1px solid var(--rule); border-radius: 999px; padding: 3px 12px; font-size: 13.5px; text-decoration: none; color: var(--steel); }
+section { background: var(--panel); border: 1px solid var(--rule); border-radius: 12px; padding: 16px 18px; margin-top: 14px; scroll-margin-top: 12px; }
+h2 { font-size: 17px; margin: 0 0 8px; }
+h3 { font-size: 15px; margin: 16px 0 4px; }
+p { margin: 0 0 10px; }
+section > :last-child { margin-bottom: 0; }
+ol, ul { margin: 0 0 10px; padding-left: 1.4em; }
+li { margin: 3px 0; }
+code { font: 13.5px var(--mono); background: var(--ground); border: 1px solid var(--rule); border-radius: 6px; padding: 1px 6px; }
+pre { margin: 0 0 10px; background: var(--ground); border: 1px solid var(--rule); border-radius: 10px; padding: 10px 12px; overflow-x: auto; }
+pre code { border: 0; padding: 0; background: none; }
+.k { font-weight: 700; }
+.note { color: var(--steel); font-size: 14px; }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; margin: 0 0 10px; }
+th, td { text-align: left; vertical-align: top; padding: 8px 12px 8px 0; border-bottom: 1px solid var(--rule); }
+th { font-size: 13px; color: var(--steel); font-weight: 600; }
+td:first-child { white-space: nowrap; font-weight: 600; }
+tr:last-child td { border-bottom: 0; }
+@media (max-width: 560px) {
+  thead { display: none; }
+  tr { display: block; padding: 8px 0; border-bottom: 1px solid var(--rule); }
+  tr:last-child { border-bottom: 0; }
+  td { display: block; border: 0; padding: 1px 0; white-space: normal !important; }
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1 class="brand">hootl</h1>
+  <a class="back" href="/">管理画面へ</a>
+</header>
+
+<main>
+  <h1>使い方</h1>
+  <p class="lead">作りたいものを数行書くと、エージェントが仕様を書き、タスクに分け、実装して、テストとレビューを通ったものだけを main に入れます。人がやるのは「何を作るか決める」「朝に要対応を見る」「外へ出す」の3つです。</p>
+
+  <ul class="toc" aria-label="目次">
+    <li><a href="#start">起動する・入る</a></li>
+    <li><a href="#make">作る（おまかせ）</a></li>
+    <li><a href="#watch">進み具合・止める</a></li>
+    <li><a href="#ideas">ネタ帳</a></li>
+    <li><a href="#blocked">要対応が出たら</a></li>
+    <li><a href="#plan">計画と承認</a></li>
+    <li><a href="#new">新しいアプリ</a></li>
+    <li><a href="#settings">設定</a></li>
+    <li><a href="#trouble">困ったとき</a></li>
+  </ul>
+
+  <section id="start">
+    <h2>起動する・入る</h2>
+    <ol>
+      <li><span class="k">起動</span>: Finder で <code>hootl-sdd</code> フォルダの <code>hootl-start.command</code> をダブルクリック（再起動も同じ）。Mac にログインすれば自動でも起動しています。</li>
+      <li><span class="k">開く</span>: <a href="http://127.0.0.1:8765">http://127.0.0.1:8765</a></li>
+      <li><span class="k">トークン</span>: ターミナルで下のコマンドを実行すると、クリップボードに入ります。ログイン画面に貼り付けて「入る」。</li>
+    </ol>
+<pre><code>hootl token</code></pre>
+    <p class="note">画面に文字として出したいときは <code>hootl token --show</code>。<code>hootl-start.command</code> を実行したときも、クリップボードに入ります。中身は <code>~/.config/hootl/web.toml</code> の <code>token</code> です。一度入れば、そのブラウザでは30日間聞かれません。</p>
+  </section>
+
+  <section id="make">
+    <h2>作る（おまかせ）</h2>
+    <ol>
+      <li>上でプロジェクトを選び、「仕様」タブを開く。</li>
+      <li>「新しく作りたいもの」に、思いついたことを数行書く。例: 「間違えた過去問だけを、もう一度解ける復習モードがほしい」</li>
+      <li>「おまかせで作る」を押す。ここから先は、承認を挟まずに進みます。</li>
+    </ol>
+    <table>
+      <thead><tr><th>段</th><th>起きること</th></tr></thead>
+      <tbody>
+        <tr><td>仕様</td><td>エージェントがコードと今の仕様を読んで、仕様を書く。決めきれない点は自分で決めて、「自分で決めたこと」に理由つきで残す</td></tr>
+        <tr><td>凍結</td><td><code>specs/</code> に入れて main にコミットする</td></tr>
+        <tr><td>計画</td><td>1件ずつ実装できるタスクに分ける</td></tr>
+        <tr><td>取り込み</td><td>機械で確かめて「待ち」に入れる。通らなければ「計画と承認」に残す</td></tr>
+        <tr><td>実装</td><td>1件ずつ、実装 → 安全柵 → ゲート → レビュー → マージ。落ちたら理由を添えて最大3回やり直す</td></tr>
+      </tbody>
+    </table>
+    <p class="note">自分で読んでから進めたいときは「下書きだけ作る」。下書きを開いて直し、「凍結して、あとはおまかせ」か「凍結してタスク案まで」を押します。</p>
+  </section>
+
+  <section id="watch">
+    <h2>進み具合・止める</h2>
+    <ul>
+      <li><span class="k">上のライン</span>: 待ち → 準備 → 実装 → 安全柵 → ゲート → レビュー → マージ → 完了。いま各工程にいるタスクが出ます。</li>
+      <li><span class="k">その下の箱</span>: おまかせがいまどの段か（仕様・凍結・計画・取り込み・実装）。「出力の末尾」を開くと、直近の記録が読めます。</li>
+      <li><span class="k">止める</span>: 実装の段では「今のタスクで止める」（動いているタスクを終わらせてから止まる。もう一度押すとすぐ止まる）。その前の段では、すぐ止まります。</li>
+      <li><span class="k">タスク</span>タブ: 行を押すと、中身・受け入れ条件・試行ごとのログと差分が読めます。</li>
+      <li><span class="k">レポート</span>タブ: ランが終わるたびに1本。完了・要対応・ネタ帳に増えた案が並びます。</li>
+      <li><span class="k">回す</span>: 「待ち」が残っているときに、時間と並列を選んで手で回せます。</li>
+    </ul>
+  </section>
+
+  <section id="ideas">
+    <h2>ネタ帳</h2>
+    <p>エージェントが、仕様づくり・計画・実装・レビューの途中で気づいた「今回は作らないが、よさそうな案」がたまります。たまるだけで、勝手には作りません。タブに新しい案の件数が出ます。</p>
+    <ul>
+      <li><span class="k">これを作る</span>（2回押し）: その案を「作りたいもの」として、おまかせで実装まで進めます。</li>
+      <li><span class="k">捨てる</span>: 一覧から下げます。「これまでの案」から戻せます。同じ名前の案は、もう拾いません。</li>
+      <li><span class="k">自分で足す</span>: 思いついたことのメモ置き場にも使えます。何かが動いている最中でも足せます。</li>
+    </ul>
+  </section>
+
+  <section id="blocked">
+    <h2>要対応が出たら</h2>
+    <p>3回やり直しても通らなかったタスクは、ラインから外れて「要対応」になります。ほかのタスクは止まりません。</p>
+    <ol>
+      <li>「タスク」タブの一番上にある要対応の行を押す。</li>
+      <li>理由と、試行ごとのログ（実装・ゲート・レビュー・差分）を読む。</li>
+      <li>原因が環境（依存・ポート・ログイン切れ）なら、直してから「やり直す（待ちに戻す）」。</li>
+      <li>タスクそのものが大きすぎる・あいまいなら、作りたいものを書き直して、もう一度おまかせで作る。</li>
+    </ol>
+  </section>
+
+  <section id="plan">
+    <h2>計画と承認</h2>
+    <p>おまかせでは、ここを通りません。タスク案が並ぶのは次のときだけです（タブに ● が付きます）。</p>
+    <ul>
+      <li>機械の確認で止まった（すでにある ID と重なる・ないタスクに依存している・依存が輪になっている・1つの仕様から20件を超えた）</li>
+      <li>「凍結してタスク案まで」や「この仕様からタスク案を作る」で、自分で読むことにした</li>
+    </ul>
+    <p>カードで読み、「タスク案を直す（JSONL）」で直して保存し、「承認して取り込む」（2回押し）。要らなければ「この案を捨てる」。</p>
+    <p class="note">承認待ちのタスク案が残っている間は、次のおまかせを始めません（上書きして失わないため）。取り込むか捨てると、また始められます。</p>
+  </section>
+
+  <section id="new">
+    <h2>新しいアプリ</h2>
+    <p>上の「＋ 新しいアプリ」から。作りたいもの・名前・型（Web／スマホ／バッチ／Cloudflare Workers）・オプション・ゲートを選んで「作る」。フォルダ・git・依存・全ゲート・起動確認・最初のコミットまで進みます（数分）。</p>
+    <p>作りたいものを書いておくと、できあがったあと、そのまま仕様 → 計画 → 実装まで続きます。下書きで止めたいときは「できたら、そのまま実装まで進める」を外します。</p>
+    <p class="note">エージェントは、そのアプリのフォルダの外を読めません。参考にしてほしい資料は、アプリの中（例: <code>materials/</code>）に置いてください。</p>
+  </section>
+
+  <section id="settings">
+    <h2>設定</h2>
+    <p>「設定」タブで、場所・型・レビュー役・おまかせの状態が見られます。カタログから作ったアプリは、使うゲートをここで切り替えられます。</p>
+    <p>おまかせの動きは、プロジェクトの <code>hootl.toml</code> に <code>[auto]</code> を書いて変えます（書かなければ、下の既定）。</p>
+    <table>
+      <thead><tr><th>キー</th><th>既定</th><th>中身</th></tr></thead>
+      <tbody>
+        <tr><td>approve</td><td>true</td><td>false にすると、仕様の下書きとタスク案で止まり、自分で承認する</td></tr>
+        <tr><td>run</td><td>true</td><td>false にすると、「待ち」に入れたところで止まる（回すのは自分で押す）</td></tr>
+        <tr><td>hours</td><td>7</td><td>おまかせで回す時間の上限。0 で、空になるまで</td></tr>
+        <tr><td>max_tasks</td><td>20</td><td>1つの仕様からこれより多く出たら、取り込まずに人に回す</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="trouble">
+    <h2>困ったとき</h2>
+    <table>
+      <thead><tr><th>症状</th><th>見る所・直し方</th></tr></thead>
+      <tbody>
+        <tr><td>まず何を見るか</td><td>ターミナルで <code>hootl doctor</code>（道具・設定・プロジェクト・画面の応答を一覧する）</td></tr>
+        <tr><td>画面が開かない</td><td><code>hootl-start.command</code> をダブルクリックし直す</td></tr>
+        <tr><td>トークンが分からない</td><td><code>hootl token</code>（クリップボードに入る）</td></tr>
+        <tr><td>おまかせが途中で止まった</td><td>箱の「出力の末尾」に理由が出ます。仕様で止まったら「仕様」タブの下書き、取り込みで止まったら「計画と承認」から続けられます</td></tr>
+        <tr><td>「承認待ちのタスク案が残っています」</td><td>「計画と承認」で取り込むか捨てる</td></tr>
+        <tr><td>「未コミットの変更があります」</td><td>回す専用の clone（「設定」タブの「場所」）を手で触っています。コミットするか元に戻す</td></tr>
+        <tr><td>始めてすぐ終わる・全部が要対応</td><td>「出力の末尾」とタスクのログを読む。<code>command not found</code> や古い Node なら、普段のターミナルから <code>hootl-start.command</code> を実行し直す</td></tr>
+        <tr><td>寝ている間に止まる</td><td>Mac がスリープしています。電源につなぎ、ディスプレイがオフでもスリープしない設定にする</td></tr>
+      </tbody>
+    </table>
+    <p><a href="/help/how-it-works" target="_blank" rel="noopener">仕組みの図解を開く</a><span class="note">　ラインの全体像と、1タスクの中で起きること。</span></p>
+  </section>
+</main>
+</body>
+</html>

@@ -1,0 +1,41 @@
+# 全部の型に共通の土台（hootl.toml の [stack] から組み立てるとき、最初に敷く）
+# {{hootl}} は hootl-sdd の置き場所、{{name}} はアプリ名に置き換わる
+prompts_dir = "{{hootl}}/prompts"
+
+[run]
+state_dir = ".hootl"
+worktree_dir = ".hootl/worktrees"
+concurrency = 1
+max_attempts = 3
+max_tasks_per_run = 30
+feedback_tail_chars = 4000
+diff_max_chars = 60000
+
+[agents.planner]
+cmd = ["claude", "-p", "--model", "opus", "--output-format", "text"]
+timeout_sec = 1800
+
+[agents.implementer]
+# 権限は --settings で無人エージェントにだけ渡す（人の Claude Code には効かない）。「広く許可・狭く拒否」
+# {{claude_settings}} は ~/.config/hootl/claude-settings.json があればそれ、なければ同梱の claude-settings.hootl.json。
+# 自分の環境で守りたい場所（ほかのリポジトリ・秘密のファイル・この hootl-sdd 自身）は、手元のほうに足す
+cmd = ["claude", "-p", "--model", "sonnet", "--output-format", "json", "--max-turns", "80",
+       "--settings", "{{claude_settings}}"]
+timeout_sec = 3600
+
+[agents.reviewer]
+# モデルは明示する（既定が提供終了すると、レビューが全部 fail になる）。使えるのは ~/.codex/models_cache.json の slug
+# 変えるときは、アプリの hootl.toml に [agents.reviewer] を書けばそちらが勝つ
+cmd = ["codex", "exec", "--model", "gpt-6.1-sol", "--sandbox", "read-only", "-"]
+timeout_sec = 1200
+
+[guard]
+out_of_scope = "review"
+# 判定する側（ゲート・規約・CI）だけを守る。型ごとの設定ファイルは stack.toml で足す
+protected_paths = ["hootl.toml", ".hootl/*", "CLAUDE.md", "AGENTS.md", ".claude/*", ".github/*"]
+always_allowed = ["docs/decisions/*"]
+test_globs = []
+forbidden_patterns = []
+
+[env]
+CI = "1"

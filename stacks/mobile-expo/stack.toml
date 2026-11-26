@@ -1,0 +1,89 @@
+title = "スマホアプリ"
+tech = "Expo SDK 58・React Native・expo-router・TypeScript・Jest"
+summary = "iPhone／Android のアプリ。画面遷移は expo-router。ストア提出用のビルドは人が行う"
+order = 2
+requires = ["node", "npm"]
+min_node = 20   # Next.js 16・Expo SDK 58・wrangler 4 の下限
+notes = """
+- 画面は `app/`（expo-router のファイルベースルーティング）、ロジックは `src/lib/` に置き、ロジックは `tests/` の Jest で確かめる
+- ネイティブのフォルダ（ios/・android/）は作らない（Expo の prebuild に任せる）。ネイティブのモジュールを足すときは `npx expo install` で SDK に合う版を入れる
+- 手で確かめるとき: `npx expo start` → iPhone の Expo Go か、`i` で iOS シミュレーター
+- ストア提出用のビルド・署名・提出は人が行う（EAS Build など）
+"""
+
+[[scaffold]]
+name = "node の版を記録"
+cmd = "node -p \"process.versions.node.split('.')[0]\" > .nvmrc"
+timeout_sec = 30
+
+[[scaffold]]
+name = "Expo を入れる"
+cmd = "npm install --no-audit --no-fund expo@^58"
+timeout_sec = 900
+
+[[scaffold]]
+name = "SDK に合う版で依存を入れる"
+cmd = "EXPO_OFFLINE=1 npx expo install expo-router react react-dom react-native react-native-web react-native-safe-area-context react-native-screens expo-linking expo-constants expo-status-bar -- --no-audit --no-fund"
+timeout_sec = 900
+
+[[scaffold]]
+name = "開発用の依存を入れる"
+cmd = "EXPO_OFFLINE=1 npx expo install --dev typescript @types/react jest-expo jest @testing-library/react-native eslint eslint-config-expo -- --no-audit --no-fund"
+timeout_sec = 900
+
+[[setup]]
+name = "node"
+cmd = 'want=$(cat .nvmrc); have=$(node -p "parseInt(process.versions.node)"); [ "$have" -ge "$want" ] || { echo "Node $want 以上が必要です（今は $(node -v)）" >&2; exit 1; }'
+timeout_sec = 30
+
+[[setup]]
+name = "install"
+cmd = "npm ci --prefer-offline --no-audit --no-fund"
+timeout_sec = 900
+
+[[gates]]
+name = "lint"
+title = "lint（ESLint）"
+cmd = "npx eslint ."
+
+[[gates]]
+name = "typecheck"
+title = "型チェック"
+cmd = "npx tsc --noEmit"
+
+[[gates]]
+name = "unit"
+title = "単体テスト（Jest）"
+cmd = "npx jest --ci"
+required = true
+
+[[gates]]
+name = "bundle"
+title = "iOS 向けにまとめられるか（expo export）"
+cmd = "npx expo export --platform ios --output-dir .hootl-export"
+timeout_sec = 900
+
+[[gates]]
+name = "deps"
+title = "依存の版が SDK に合っているか（expo install --check）"
+cmd = "EXPO_OFFLINE=1 npx expo install --check"
+default = false
+
+[[verify]]
+name = "起動確認（Web 版を書き出して開く）"
+cmd = 'npx expo export --platform web --output-dir .hootl-web && "{{python}}" "{{hootl}}/hootl/boot.py" --static .hootl-web --url "http://127.0.0.1:{port}/" --expect root'
+timeout_sec = 600
+
+[guard]
+protected_paths = ["tsconfig.json", "eslint.config.js", "jest.config.js", "app.json"]
+always_allowed = ["package.json", "package-lock.json", "assets/*"]
+test_globs = ["tests/*", "*.test.ts", "*.test.tsx"]
+forbidden_patterns = [
+  '\b(it|test|describe)\.(skip|only|todo)\(',
+  '\bx(it|describe)\(',
+  '@ts-(ignore|nocheck|expect-error)',
+  'eslint-disable',
+]
+
+[env]
+EXPO_NO_TELEMETRY = "1"

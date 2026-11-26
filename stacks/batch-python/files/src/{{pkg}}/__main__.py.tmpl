@@ -1,0 +1,23 @@
+"""{{title}} の入口。`python -m {{pkg}} [--dry-run]`"""
+
+from __future__ import annotations
+
+import argparse
+import logging
+from datetime import datetime
+
+from .job import run
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(prog="{{name}}", description="{{summary_line}}")
+    parser.add_argument("--dry-run", action="store_true", help="書き込み・外部への送信をせずに流れだけ確かめる")
+    args = parser.parse_args(argv)
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    result = run(now=datetime.now(), dry_run=args.dry_run)
+    print(result.summary)
+    return 0 if result.ok else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

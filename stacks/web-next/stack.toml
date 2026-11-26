@@ -1,0 +1,179 @@
+title = "Webアプリ"
+tech = "Next.js 16・React 19・TypeScript・Tailwind 4・Vitest"
+summary = "画面のある Web サービス。学習サイト・管理画面・ダッシュボードなど"
+order = 1
+requires = ["node", "npm"]
+min_node = 20   # Next.js 16・Expo SDK 58・wrangler 4 の下限
+ports = ["port"]
+notes = """
+- 画面は `src/app/`（App Router）、ロジックは `src/lib/` に置き、ロジックは `tests/` の Vitest で確かめる
+- サーバーとクライアントの境界を守る（`"use client"` は必要な部品だけ）
+- 生存確認の `src/app/api/health/route.ts` は消さない（起動確認ゲートが使う）
+- 開発サーバー: `npm run dev`（ポート {{port}}）
+"""
+
+# ---- 作るときだけ（依存はメジャー版を固定して入れ、lockfile で完全に固定する）----
+[[scaffold]]
+name = "node の版を記録"
+cmd = "node -p \"process.versions.node.split('.')[0]\" > .nvmrc"
+timeout_sec = 30
+
+[[scaffold]]
+name = "依存を入れる"
+cmd = "npm install --no-audit --no-fund next@16 react@19 react-dom@19"
+timeout_sec = 900
+
+[[scaffold]]
+name = "開発用の依存を入れる"
+cmd = "npm install -D --no-audit --no-fund typescript@~6.0 @types/node @types/react@19 @types/react-dom@19 eslint@10 eslint-config-next@16 tailwindcss@4 @tailwindcss/postcss@4 vitest@5 vite@8"
+timeout_sec = 900
+
+# ---- 毎回の準備（worktree を作った直後）----
+[[setup]]
+name = "node"
+cmd = 'want=$(cat .nvmrc); have=$(node -p "parseInt(process.versions.node)"); [ "$have" -ge "$want" ] || { echo "Node $want 以上が必要です（今は $(node -v)）" >&2; exit 1; }'
+timeout_sec = 30
+
+[[setup]]
+name = "install"
+cmd = "npm ci --prefer-offline --no-audit --no-fund"
+timeout_sec = 900
+
+# ---- ゲート（上から順に。npm scripts を経由せずツールを直接呼ぶ）----
+[[gates]]
+name = "lint"
+title = "lint（ESLint）"
+cmd = "npx eslint ."
+
+[[gates]]
+name = "typecheck"
+title = "型チェック"
+cmd = "npx next typegen && npx tsc --noEmit"
+
+[[gates]]
+name = "unit"
+title = "単体テスト（Vitest）"
+cmd = "npx vitest run"
+required = true
+
+[[gates]]
+name = "build"
+title = "本番ビルド"
+cmd = "npx next build"
+timeout_sec = 900
+
+[[gates]]
+name = "boot"
+title = "起動確認（本番ビルドを起動して /api/health を叩く）"
+cmd = '[ -f .next/BUILD_ID ] || npx next build; "{{python}}" "{{hootl}}/hootl/boot.py" --cmd "npx next start -p {port}" --url "http://127.0.0.1:{port}/api/health"'
+timeout_sec = 180
+default = false
+
+# ---- 作った直後に1回だけ（アプリが立ち上がることを確かめる）----
+[[verify]]
+name = "起動確認"
+cmd = '[ -f .next/BUILD_ID ] || npx next build; "{{python}}" "{{hootl}}/hootl/boot.py" --cmd "npx next start -p {port}" --url "http://127.0.0.1:{port}/api/health"'
+timeout_sec = 180
+
+[guard]
+protected_paths = ["tsconfig.json", "eslint.config.mjs", "vitest.config.ts", "src/app/api/health/route.ts"]
+always_allowed = ["package.json", "package-lock.json", "src/components/ui/*", "public/*"]
+test_globs = ["tests/*", "e2e/*", "*.test.ts", "*.test.tsx", "*.spec.ts"]
+forbidden_patterns = [
+  '\b(it|test|describe)\.(skip|only|todo)\(',
+  '\bx(it|describe)\(',
+  '@ts-(ignore|nocheck|expect-error)',
+  'eslint-disable',
+]
+
+[env]
+NEXT_TELEMETRY_DISABLED = "1"
+
+# ==== オプション ====
+[[options]]
+id = "e2e"
+title = "E2E テスト（Playwright）"
+summary = "ブラウザで画面を操作するテストをゲートに足す。遅くなるが、画面の壊れに気づける"
+ports = ["e2e_port"]
+
+[[options.scaffold]]
+name = "Playwright を入れる"
+cmd = "npm install -D --no-audit --no-fund @playwright/test@1 && npx playwright install chromium"
+timeout_sec = 900
+
+[[options.gates]]
+name = "e2e"
+title = "E2E テスト（Playwright）"
+cmd = "npx playwright test"
+timeout_sec = 900
+after = "build"
+
+[options.guard]
+protected_paths = ["playwright.config.ts"]
+
+[[options]]
+id = "cloudflare"
+title = "Cloudflare Workers に載せる"
+summary = "OpenNext で Cloudflare Workers 向けにビルドできる形にする。デプロイは人が `npm run deploy` で行う"
+conflicts = ["postgres"]
+
+[[options.scaffold]]
+name = "OpenNext と wrangler を入れる"
+cmd = "npm install --no-audit --no-fund @opennextjs/cloudflare@1 && npm install -D --no-audit --no-fund wrangler@4"
+timeout_sec = 900
+
+[[options.scaffold]]
+name = "デプロイ用の npm scripts を足す"
+cmd = "npm pkg set scripts.preview='opennextjs-cloudflare build && opennextjs-cloudflare preview' scripts.deploy='opennextjs-cloudflare build && opennextjs-cloudflare deploy'"
+timeout_sec = 60
+
+[[options.gates]]
+name = "cf-build"
+title = "Cloudflare 向けビルド（OpenNext）"
+cmd = "npx opennextjs-cloudflare build"
+timeout_sec = 900
+after = "build"
+
+[options.guard]
+protected_paths = ["open-next.config.ts"]
+
+[[options]]
+id = "postgres"
+title = "データベース（PostgreSQL・Prisma）"
+summary = "Docker の PostgreSQL と Prisma 7。テストは使い捨ての DB を毎回まっさらにして使う"
+requires = ["docker"]
+ports = ["db_port"]
+
+[[options.scaffold]]
+name = "Prisma を入れる"
+cmd = "npm install --no-audit --no-fund @prisma/client@7 @prisma/adapter-pg@7 dotenv && npm install -D --no-audit --no-fund prisma@7 tsx"
+timeout_sec = 900
+
+[[options.scaffold]]
+name = "DB を起動する"
+cmd = "docker compose up -d --wait"
+timeout_sec = 300
+
+[[options.scaffold]]
+name = "DB を作る（普段使いの DB とテスト用 DB）"
+cmd = "npx prisma generate && DATABASE_URL=postgresql://{{pkg}}:{{pkg}}@localhost:{{db_port}}/{{pkg}} npx prisma db push && npx prisma db push"
+timeout_sec = 300
+
+[[options.setup]]
+name = "test-db"
+cmd = "npx prisma generate && npx prisma db push --force-reset"
+timeout_sec = 300
+
+[[options.gates]]
+name = "schema"
+title = "スキーマの検証と反映"
+cmd = "npx prisma validate && npx prisma db push --accept-data-loss"
+after = "lint"
+required = true
+
+[options.guard]
+always_allowed = ["prisma/schema.prisma", "prisma/seed.ts"]
+forbidden_patterns = []
+
+[options.env]
+DATABASE_URL = "postgresql://{{pkg}}:{{pkg}}@localhost:{{db_port}}/{{pkg}}_test"
