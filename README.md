@@ -27,8 +27,8 @@
 | タスク（ライン） | 要対応のタスク | 仕様 |
 | --- | --- | --- |
 | ![タスク](docs/images/01-tasks.png) | ![要対応](docs/images/02-task-detail.png) | ![仕様](docs/images/03-spec.png) |
-| **計画と承認** | **新しいアプリ** | **設定（ゲート）** |
-| ![計画と承認](docs/images/04-plan.png) | ![新しいアプリ](docs/images/07-new-app.png) | ![設定](docs/images/06-settings.png) |
+| **ネタ帳** | **新しいアプリ** | **設定（ゲート・おまかせ）** |
+| ![ネタ帳](docs/images/10-ideas.png) | ![新しいアプリ](docs/images/07-new-app.png) | ![設定](docs/images/06-settings.png) |
 
 仕組みの全体像は `docs/how-it-works.html`、管理画面は `docs/web-admin.md`、新しいアプリは `docs/new-app.md`。
 

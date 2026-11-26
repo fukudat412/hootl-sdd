@@ -3,10 +3,16 @@
     python3 scripts/demo.py --fresh &     # 先にデモを起動しておく
     pip install playwright && playwright install chromium   # 初回だけ
     python3 scripts/screenshots.py
+
+入っている Chrome を使うなら、Chromium を取ってこなくてよい: PLAYWRIGHT_CHANNEL=chrome python3 scripts/screenshots.py
+
+画面には、デモを置いた場所と hootl-sdd の場所が写る（設定・新しいアプリ）。公開する画像を撮るときは、
+自分の名前が入らない場所（例: /tmp/hootl-sdd に clone して、そこから demo.py を起動する）で撮ること。
 """
 
 from __future__ import annotations
 
+import os
 import sys
 import time
 from pathlib import Path
@@ -46,7 +52,7 @@ def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
     errors: list[str] = []
     with sync_playwright() as p:
-        browser = p.chromium.launch()
+        browser = p.chromium.launch(channel=os.environ.get("PLAYWRIGHT_CHANNEL") or None)
         page = browser.new_page(viewport={"width": 1200, "height": 900})
         page.on("pageerror", lambda e: errors.append(str(e)))
         login(page)
@@ -61,6 +67,8 @@ def main() -> int:
         page.click("text=開いて直す")
         time.sleep(1)
         shot(page, "03-spec")
+        tab(page, "ideas")
+        shot(page, "10-ideas")
         tab(page, "plan")
         shot(page, "04-plan")
         tab(page, "reports")
