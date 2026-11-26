@@ -12,7 +12,6 @@
 
 | ドキュメント | 中身 |
 | --- | --- |
-| [docs/loop-design.md](docs/loop-design.md) | ループの型の比較と採否、状態遷移、判定の原則 |
 | [docs/dev-standards.md](docs/dev-standards.md) | タスクの書き方、ブランチ・コミット、完了の定義、テスト規約 |
 | [docs/tech-stack.md](docs/tech-stack.md) | ハーネス・エージェント・対象アプリの技術選定 |
 | [docs/how-it-works.html](docs/how-it-works.html) | 仕組みの図解（ブラウザで開く） |
