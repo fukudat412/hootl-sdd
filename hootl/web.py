@@ -169,6 +169,12 @@ def load_web_config(path: str | Path) -> WebConfig:
 
 
 # ---- バックグラウンドの仕事（run / plan / spec / auto / new）-------------------
+def job_env(pythonpath: str) -> dict[str, str]:
+    """仕事（とその先のエージェント・ゲート）に渡す環境変数。管理画面のトークンは渡さない。"""
+    env = {k: v for k, v in os.environ.items() if k != "HOOTL_WEB_TOKEN"}
+    return {**env, "PYTHONUNBUFFERED": "1", "PYTHONPATH": pythonpath}
+
+
 JOB_RECORD = "web-job.json"   # 動かした仕事の控え（管理画面を再起動しても、動いている仕事を見失わないため）
 # 引き取ってよい仕事の種類と、その hootl のサブコマンド。控えは .hootl の中にあり、エージェントが書き換えられる
 # 場所なので、控えから信じるのは「種類・pid・始めた時刻」だけにする（ログの場所は控えから取らない）
@@ -300,7 +306,7 @@ class Jobs:
             try:
                 proc = subprocess.Popen(cmd, cwd=cwd, stdout=log, stderr=subprocess.STDOUT,
                                         start_new_session=True,
-                                        env={**os.environ, "PYTHONUNBUFFERED": "1", "PYTHONPATH": pythonpath})
+                                        env=job_env(pythonpath))
             finally:
                 log.close()               # 子プロセスが自分の分を持っている。こちらで開けたままにしない
             job = Job(kind, proc, log_path, time.time())

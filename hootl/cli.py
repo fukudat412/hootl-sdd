@@ -119,6 +119,10 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S")
+    if args.cmd != "web":
+        # 管理画面のトークンは、管理画面だけが使う。ここから起動するエージェントやゲートには渡さない
+        import os
+        os.environ.pop("HOOTL_WEB_TOKEN", None)
     if args.cmd == "web":
         from .web import serve
         serve(args.web_config)
