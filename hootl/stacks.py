@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import copy
+import json
 import os
 import re
 import tomllib
@@ -170,12 +171,75 @@ def substitute(value, variables: dict[str, str]):
     return value
 
 
+def config_dir() -> Path:
+    """手元の設定の置き場所（管理画面のトークン・権限設定）。HOOTL_CONFIG_DIR で変えられる。"""
+    return Path(os.environ.get("HOOTL_CONFIG_DIR") or "~/.config/hootl").expanduser()
+
+
+def _rule_paths(path: Path) -> list[str]:
+    """Claude Code の権限ルールでのパスの書き方（ホームの下は ~/…、それ以外は //… の絶対パス）。
+
+    リンクを辿る前と後で場所が違えば、両方を返す（どちらの書き方で触られても止まるように）。
+    """
+    out = []
+    home = Path.home()
+    for p, h in ((path.expanduser().absolute(), home.absolute()), (path.expanduser().resolve(), home.resolve())):
+        try:
+            rule = "~/" + str(p.relative_to(h))
+        except ValueError:
+            rule = "//" + str(p).lstrip("/")
+        if rule not in out:
+            out.append(rule)
+    return out
+
+
+def required_denies() -> list[str]:
+    """どの権限設定にも必ず足す拒否。判定する側（このハーネス）と、権限設定そのものを、エージェントに触らせない。
+
+    - ハーネスの編集: ゲートやレビューの仕組みを書き換えれば、何でも「合格」にできてしまう
+    - 設定フォルダの編集: 権限設定を書き換えれば、次のタスクから拒否が外れる
+    - 設定フォルダの読み取り: 管理画面のトークンが入っている
+    """
+    rules = [f"Edit({p}/**)" for p in _rule_paths(ROOT)]
+    for p in _rule_paths(config_dir()):
+        rules += [f"Edit({p}/**)", f"Read({p}/**)"]
+    return rules
+
+
 def claude_settings_path() -> Path:
-    """無人エージェントに渡す権限設定。手元の上書き（自分の環境で守りたい場所を足したもの）があれば、そちらを使う。"""
-    for candidate in (os.environ.get("HOOTL_CLAUDE_SETTINGS"), "~/.config/hootl/claude-settings.json"):
+    """無人エージェントに渡す権限設定のファイル。毎回組み立てて、設定フォルダに置いたものを渡す。
+
+    元にするのは、手元の版（<設定フォルダ>/claude-settings.json。自分の環境で守りたい場所を足したもの）があれば
+    それ、なければ同梱の claude-settings.hootl.json。どちらを元にしても required_denies() を必ず足すので、
+    手元の版が古くても・書き換えられても、ハーネスと権限設定への拒否は外れない。
+    """
+    shipped = ROOT / "stacks" / COMMON / "claude-settings.hootl.json"
+    base = shipped
+    for candidate in (os.environ.get("HOOTL_CLAUDE_SETTINGS"), config_dir() / "claude-settings.json"):
         if candidate and Path(candidate).expanduser().is_file():
-            return Path(candidate).expanduser()
-    return ROOT / "stacks" / COMMON / "claude-settings.hootl.json"
+            base = Path(candidate).expanduser()
+            break
+    try:
+        data = json.loads(base.read_text(encoding="utf-8"))
+        deny = data.setdefault("permissions", {}).setdefault("deny", [])
+        if not isinstance(deny, list):
+            raise ValueError("permissions.deny が配列ではありません")
+    except (OSError, ValueError, AttributeError) as exc:
+        # 読めない設定のまま、守りなしで回さない
+        raise ValueError(f"無人エージェントの権限設定を読めません: {base}: {exc}") from exc
+    deny += [r for r in required_denies() if r not in deny]
+    text = json.dumps(data, ensure_ascii=False, indent=2) + "\n"
+    out = config_dir() / "claude-settings.rendered.json"
+    try:
+        if not out.is_file() or out.read_text(encoding="utf-8") != text:
+            out.parent.mkdir(parents=True, exist_ok=True)
+            tmp = out.with_name(f"{out.name}.{os.getpid()}.tmp")
+            tmp.write_text(text, encoding="utf-8")
+            os.chmod(tmp, 0o600)
+            os.replace(tmp, out)
+    except OSError as exc:
+        raise ValueError(f"無人エージェントの権限設定を書けません: {out}: {exc}") from exc
+    return out
 
 
 def variables_for(stack_section: dict, repo: Path | None = None) -> dict[str, str]:

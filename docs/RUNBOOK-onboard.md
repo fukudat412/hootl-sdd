@@ -118,7 +118,7 @@ cp $HOOTL/kits/_template/claude-settings.hootl.json $KIT/claude-settings.hootl.j
    - `[env]`: テスト用の接続先とダミーの秘密情報だけ。本番の値は入れない
    - `push_remote`: 手順 2 の答えで自動デプロイの心配がないときだけ残す
    - `<codex-model>` は手順 6 で埋める
-2. **`$KIT/claude-settings.hootl.json`**: `deny` の `Read(...)` に、手順 2 で見つけた秘密情報のファイルを足す。
+2. **`$KIT/claude-settings.hootl.json`**: `deny` の `Read(...)` に、手順 2 で見つけた秘密情報のファイルを足す。あわせて `Edit(<$HOOTL のパス>/**)`（ハーネス自身）と `Edit(<$PROJECT_DIR のパス>/**)`（人が普段作業している clone）を足す。パスは `~/…`（ホームの下）か `//…`（絶対パス）で書く。この設定ファイルをそのまま渡す形（キット）では、ハーネスへの拒否は自動では足されない。
 3. **CLAUDE.md**: `$HOOTL/kits/_template/CLAUDE.hootl.md` の内容を、`$PROJECT_DIR/CLAUDE.md` の末尾に追記する（なければ CLAUDE.md を作る）。`<!-- RUNBOOK 手順 5 -->` のコメント箇所を、このプロジェクトに合わせて埋めてからコメントを消す。
 4. **`spec.md`**: `$PROJECT_DIR/spec.md` に下書きを作る。README・docs・TODO から「目的」「変えない前提（技術構成）」「今期やること（優先順の箇条書き）」「やらないこと」を拾う。冒頭に「下書き。人が直して凍結する」と書く。
 5. **`.gitignore`**: `.hootl/` と `hootl.toml` を足す。

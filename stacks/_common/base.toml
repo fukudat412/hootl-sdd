@@ -17,8 +17,10 @@ timeout_sec = 1800
 
 [agents.implementer]
 # 権限は --settings で無人エージェントにだけ渡す（人の Claude Code には効かない）。「広く許可・狭く拒否」
-# {{claude_settings}} は ~/.config/hootl/claude-settings.json があればそれ、なければ同梱の claude-settings.hootl.json。
-# 自分の環境で守りたい場所（ほかのリポジトリ・秘密のファイル・この hootl-sdd 自身）は、手元のほうに足す
+# {{claude_settings}} は、起動のたびに組み立てる権限設定（~/.config/hootl/claude-settings.rendered.json）。
+# 元は ~/.config/hootl/claude-settings.json があればそれ、なければ同梱の claude-settings.hootl.json。
+# どちらを元にしても、この hootl-sdd と ~/.config/hootl への拒否は必ず足される（hootl/stacks.py の required_denies）。
+# 自分の環境で守りたい場所（ほかのリポジトリ・秘密のファイル）は、手元のほうに足す
 cmd = ["claude", "-p", "--model", "sonnet", "--output-format", "json", "--max-turns", "80",
        "--settings", "{{claude_settings}}"]
 timeout_sec = 3600

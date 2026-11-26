@@ -19,7 +19,9 @@
       "Bash(sudo:*)",
       "Read(~/.ssh/**)",
       "Read(~/.aws/**)",
-      "Read(~/.config/gh/**)"
+      "Read(~/.config/gh/**)",
+      "Edit(~/.config/hootl/**)",
+      "Read(~/.config/hootl/**)"
     ]
   }
 }

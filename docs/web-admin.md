@@ -110,7 +110,8 @@ CLI なら `hootl auto --idea-file idea.txt` でおまかせ、`hootl ideas` で
 | ファイル | 中身 |
 | --- | --- |
 | `~/.config/hootl/web.toml` | ポート・トークン・通すメール・プロジェクトを探す場所（`projects_dir`）。手で `[[projects]]` を足してもよい（setup はそれを残す） |
-| `~/.config/hootl/claude-settings.json`（任意・手で作る） | 無人エージェントに渡す権限設定の、自分の環境向けの版。あれば、同梱の `stacks/_common/claude-settings.hootl.json` の代わりに使う。同梱のものを写して、`deny` に守りたい場所（ほかのリポジトリ・秘密のファイル・この hootl-sdd 自身）を足す |
+| `~/.config/hootl/claude-settings.json`（任意・手で作る） | 無人エージェントに渡す権限設定の、自分の環境向けの版。あれば、同梱の `stacks/_common/claude-settings.hootl.json` の代わりに元にする。同梱のものを写して、`deny` に守りたい場所（ほかのリポジトリ・秘密のファイル）を足す |
+| `~/.config/hootl/claude-settings.rendered.json` | 実際にエージェントに渡す権限設定。起動のたびに hootl が組み立てる（手で直しても上書きされる）。元の設定に、hootl-sdd 自身と `~/.config/hootl/` への拒否を必ず足したもの |
 | `~/Library/LaunchAgents/dev.hootl.web.plist` | hootl web の自動起動。ログは `~/Library/Logs/dev.hootl.web.log` |
 | `~/.cloudflared/hootl.yml` | トンネルの行き先（`--hostname` のとき） |
 | `~/Library/LaunchAgents/dev.hootl.tunnel.plist` | トンネルの自動起動。ログは `~/Library/Logs/dev.hootl.tunnel.log` |

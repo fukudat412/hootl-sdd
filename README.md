@@ -101,7 +101,7 @@ hootl ideas build 3                          # 選んだ案を、おまかせで
 ## 自分の環境に合わせる
 
 - 専用 clone を置く所: `hootl setup --runs-dir <場所>`（既定は `~/hootl-runs`。2回目以降は、決めた場所を覚えている）
-- 無人エージェントの権限: 同梱の `stacks/_common/claude-settings.hootl.json` は、どの環境でも要る最小限（push・sudo・`~/.ssh` などの拒否）。自分の環境で守りたい場所は、これを `~/.config/hootl/claude-settings.json` に写して `deny` に足す（あれば、そちらが使われる）
+- 無人エージェントの権限: 同梱の `stacks/_common/claude-settings.hootl.json` は、どの環境でも要る最小限（push・sudo・`~/.ssh` などの拒否）。自分の環境で守りたい場所は、これを `~/.config/hootl/claude-settings.json` に写して `deny` に足す（あれば、そちらが元になる）。どちらを元にしても、hootl-sdd 自身の編集と `~/.config/hootl/`（管理画面のトークン・権限設定）の読み書きへの拒否は、hootl が毎回足す
 - プロジェクトごとの設定（`kits/<名前>/`）は、そのプロジェクトのものなのでコミットしなくてよい。ひな形は `kits/_template/`
 
 ## ライセンス

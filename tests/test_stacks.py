@@ -282,6 +282,37 @@ def test_new_app_with_an_idea_goes_on_to_planning_by_itself(catalog, tmp_path, m
     assert len(specs.list_specs(load(catalog / "stops" / "hootl.toml"))["drafts"]) == 1
 
 
+def test_agent_permissions_always_protect_the_harness_and_the_settings(tmp_path, monkeypatch):
+    """エージェントに渡す権限設定には、元がどれでも、ハーネス自身と設定フォルダへの拒否が入る。"""
+    cfg_dir = tmp_path / "cfg"
+    monkeypatch.setenv("HOOTL_CONFIG_DIR", str(cfg_dir))
+    need = stacks.required_denies()
+    assert any(r.startswith("Edit(") and "hootl-sdd" in r or str(stacks.ROOT.name) in r for r in need)
+    assert any(r.startswith("Read(") and "cfg" in r for r in need) and any(r.startswith("Edit(") and "cfg" in r for r in need)
+
+    # 同梱の設定が元: 自分の環境の話は入っていないが、必須の拒否は足されている
+    out = stacks.claude_settings_path()
+    assert out == cfg_dir / "claude-settings.rendered.json" and oct(out.stat().st_mode)[-3:] == "600"
+    deny = json.loads(out.read_text())["permissions"]["deny"]
+    assert set(need) <= set(deny) and "Bash(git push:*)" in deny
+
+    # 手元の版が元: 足した拒否は残り、必須の拒否は、書いていなくても（消されていても）足される
+    (cfg_dir / "claude-settings.json").write_text(json.dumps(
+        {"permissions": {"allow": ["Read"], "deny": ["Read(~/secret/**)"]}}))
+    deny = json.loads(stacks.claude_settings_path().read_text())["permissions"]["deny"]
+    assert "Read(~/secret/**)" in deny and set(need) <= set(deny)
+
+    # カタログから組み立てた実装役は、この組み立てた設定を使う
+    cmd = stacks.compose({"name": "web-next", "app": "x", "vars": {"port": 3101, "e2e_port": 4101}},
+                         tmp_path, REAL)["agents"]["implementer"]["cmd"]
+    assert cmd[cmd.index("--settings") + 1] == str(out)
+
+    # 読めない設定のまま、守りなしでは回さない
+    (cfg_dir / "claude-settings.json").write_text("{こわれた")
+    with pytest.raises(ValueError, match="権限設定を読めません"):
+        stacks.claude_settings_path()
+
+
 def test_conflicts_are_two_way():
     web = stacks.load_stack("web-next", REAL)
     assert "postgres" in web.options["cloudflare"].conflicts
